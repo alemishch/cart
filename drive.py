@@ -58,7 +58,7 @@ def setSpeed(motor, speed):
 		motor[3].ChangeDutyCycle(speed)
 		
 
-def move_forward(speed, time, motors):
+def moveForward(speed, time, motors):
 	start = time.time()
 	for motor in motors:
 			setSpeed(motor, speed)
@@ -70,19 +70,25 @@ def move_forward(speed, time, motors):
 			
 	
 	
-def rotate_90(time, where, motors, speed):
-	time = time.time()
-	if where == 'left':
-		setSpeed(motors[0], 0)
-		setSpeed(motors[2], 0)
-		setSpeed(motors[1], speed)
-		setSpeed(motors[3], -speed)
-	elif where == 'right':
-		setSpeed(motors[1], 0)
-		setSpeed(motors[2], 0)
-		setSpeed(motors[0], speed)
-		setSpeed(motors[3], -speed)
-		for motor in motors:
-			setSpeed(motor, 0)
+def rotate90(where, motors):
+	time = 0 ######
+	speed = 0 #####
+	begin = time.time()
+	while time.time() < begin:
+		if where == 'left':
+			setSpeed(motors[0], 0)
+			setSpeed(motors[2], 0)
+			setSpeed(motors[1], speed)
+			setSpeed(motors[3], -speed)
+		elif where == 'right':
+			setSpeed(motors[1], 0)
+			setSpeed(motors[2], 0)
+			setSpeed(motors[0], speed)
+			setSpeed(motors[3], -speed)
+	for motor in motors:
+		setSpeed(motor, 0)
+
+
+def rotateAngle(angle, motors)
 	
 		

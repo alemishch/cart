@@ -25,7 +25,7 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 ###cap = cv2.VideoCapture(0)
 
     
-def getIm(img_processed, img_raw, x, y, h, w):
+def getDigit(img_processed, img_raw, x, y, h, w):
     ret, thresh = cv2.threshold(blur, 175, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     newImage = thresh[y:y + h, x:x + w] #saving threshold image into new image
     #resizing the image into 28*28. using opencv to resize image without distortion. 
@@ -60,10 +60,23 @@ def GetAngle(img_processed, img_raw, x, y, h, w):
 
     lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]),
                         min_line_length, max_line_gap)
+
+    lengths = []
+    angles = []
     if lines is not None:
         for line in lines:
             for x1,y1,x2,y2 in line:
                 cv2.line(img_raw,(x1,y1),(x2,y2),(255,0,0),5)
+                lengths.append(np.sqrt((x1-x1)**2+(y1-y2)**2))
+                if y1>y2:                                           ########test later
+                    dx = y1-y2
+                else:
+                    dx = y2-y1
+                angles.append(dx/np.abs(y1 - y2))
+
+    return angles
+
+
     
     
 while True:
@@ -80,8 +93,8 @@ while True:
     
     cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
     
-    num = getIm(blur, img, x, y, h, w)
-    GetAngle(blur, img, x, y, h, w)
+    num = getDigit(blur, img, x, y, h, w)
+    angles = GetAngle(blur, img, x, y, h, w)
     
     cv2.imshow("Frame", img)
     
