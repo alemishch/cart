@@ -1,94 +1,100 @@
 import RPi.GPIO as GPIO          
 import time
 
-en1 = 26
-en2 = 22
-en3 = _
-en4 = _
-in1_1 = 19
-in1_2 = 13
-in2_1 = 6
-in2_2 = 5
-in3_1 = 6
-in3_2 = 5
-in4_1 = 6
-in4_2 = 5
+en1 = 19
+en2 = 12
+en3 = 18
+en4 = 13
+in1_1 = 26
+in1_2 = 6
+in2_1 = 5
+in2_2 = 0
+in3_1 = 20
+in3_2 = 16
+in4_1 = 1
+in4_2 = 7
 
-orient = 1
 
+GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(in1_1,GPIO.OUT)
-GPIO.setup(in1_2,GPIO.OUT)
-GPIO.setup(in2_1,GPIO.OUT)
-GPIO.setup(in2_2,GPIO.OUT)
-GPIO.setup(en1,GPIO.OUT)
-GPIO.setup(en2,GPIO.OUT)
-GPIO.setup(en3,GPIO.OUT)
-GPIO.setup(en4,GPIO.OUT)
-GPIO.output(in1_1,GPIO.LOW)
-GPIO.output(in1_2,GPIO.LOW)
-GPIO.output(in2_1,GPIO.LOW)
-GPIO.output(in2_2,GPIO.LOW)
-GPIO.output(in3_1,GPIO.LOW)
-GPIO.output(in3_2,GPIO.LOW)
-GPIO.output(in4_1,GPIO.LOW)
-GPIO.output(in4_2,GPIO.LOW)
-p1=GPIO.PWM(en1,1000)
-p2=GPIO.PWM(en2,1000)
-p1=GPIO.PWM(en3,1000)
-p2=GPIO.PWM(en4,1000)
-p1.start(0)
-p2.start(0)
-p3.start(0)
-p4.start(0)
 
-motors = [(in1_1, in1_2, en1), (in2_1, in2_2, en2), (in3_1, in3_2, en3), (in4_1, in4_2, en4)]
-
-def setSpeed(motor, speed):
-	if speed == 0:
-		GPIO.output(motor[0] ,GPIO.LOW)
-		GPIO.output(motor[1] ,GPIO.LOW)
-	elif speed > 0:
-		GPIO.output(motor[0] ,GPIO.HIGH)
-		GPIO.output(motor[1] ,GPIO.LOW)
-		motor[3].ChangeDutyCycle(speed)
-	else:
-		GPIO.output(motor[0] ,GPIO.LOW)
-		GPIO.output(motor[1] ,GPIO.HIGH)
-		motor[3].ChangeDutyCycle(speed)
+class Motor:
+	def __init__(self, in1, in2, en):
+		self.in1 = in1
+		self.in2 = in2
+		self.en = en
+		GPIO.setup(self.in1, GPIO.OUT)
+		GPIO.setup(self.in2, GPIO.OUT)
+		GPIO.setup(self.en, GPIO.OUT)
+		GPIO.output(self.in1, GPIO.LOW)
+		GPIO.output(self.in2, GPIO.LOW)
+		self.p = GPIO.PWM(self.en, 1000)
+		self.p.start(0)
 		
-
-def moveForward(speed, time, motors):
-	start = time.time()
-	for motor in motors:
-			setSpeed(motor, speed)
-	while time.time() < time:
-		continue
-	for motor in motors:
-			setSpeed(motor, 0)
+	def setSpeed(self, speed):
+		if speed == 0:
+			GPIO.output(self.in1 ,GPIO.LOW)
+			GPIO.output(self.in2 ,GPIO.LOW)
+		elif speed > 0:
+			GPIO.output(self.in1, GPIO.LOW)
+			GPIO.output(self.in2, GPIO.HIGH)
+			self.p.ChangeDutyCycle(speed)
+		elif speed < 0:
+			GPIO.output(self.in1, GPIO.HIGH)
+			GPIO.output(self.in2, GPIO.LOW)
+			self.p.ChangeDutyCycle(-speed)
 			
 			
+class Cart:
+	def __init__(self, m1, m2, m3, m4):
+		self.fl = m1
+		self.fr = m2
+		self.bl = m3
+		self.br = m4
+		self.motors = [self.fl, self.fr, self.bl, self.br]
+		
+		
+	def moveForward(self, speed, Time):
+		for motor in self.motors:
+			motor.setSpeed(speed)
+		start = time.time()
+		while time.time() - start < Time:
+			continue
+		for motor in self.motors:
+			motor.setSpeed(0)		
 	
 	
-def rotate90(where, motors):
-	time = 0 ######
-	speed = 0 #####
-	begin = time.time()
-	while time.time() < begin:
+	def rotate90(self, where):
+		Time = 2 ######
+		speed = 5 #####
 		if where == 'left':
-			setSpeed(motors[0], 0)
-			setSpeed(motors[2], 0)
-			setSpeed(motors[1], speed)
-			setSpeed(motors[3], -speed)
+			self.fl.setSpeed(0)
+			self.br.setSpeed(0)
+			self.frsetSpeed(speed)
+			self.bl.setSpeed(-speed)
 		elif where == 'right':
-			setSpeed(motors[1], 0)
-			setSpeed(motors[2], 0)
-			setSpeed(motors[0], speed)
-			setSpeed(motors[3], -speed)
-	for motor in motors:
-		setSpeed(motor, 0)
+			self.fr.setSpeed(0)
+			self.bl.setSpeed(0)
+			self.fl.setSpeed(speed)
+			self.br.setSpeed(-speed)
+		begin = time.time()
+		while time.time() - begin < Time:
+			continue
+		for motor in self.motors:
+			motor.setSpeed(0)
+			
 
-
-def rotateAngle(angle, motors)
+		def rotateAngle(self, angle):
+			pass
 	
+m1 = Motor(in1_1, in1_2, en1)
+m2 = Motor(in2_1, in2_2, en2)
+m3 = Motor(in3_1, in3_2, en3)
+m4 = Motor(in4_1, in4_2, en4)
+
+cart = Cart(m1, m2, m3, m4)
+
+cart.moveForward(50, 7)
+#cart.rotate90('right')
+#m3.setSpeed(50)
 		
