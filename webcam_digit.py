@@ -69,15 +69,24 @@ def GetAngle(img_processed, img_raw, x, y, h, w):
                 cv2.line(img_raw,(x1,y1),(x2,y2),(255,0,0),5)
                 lengths.append(np.sqrt((x1-x1)**2+(y1-y2)**2))
                 if y1>y2:                                           ########test later
-                    dx = y1-y2
+                    dx = x1-x2
                 else:
-                    dx = y2-y1
-                angles.append(dx/np.abs(y1 - y2))
-
-    return angles
-
-
+                    dx = x2-x1
+                angles.append(180/np.pi*np.arctan(dx/np.abs(y1 - y2))) ############# test zero
+    ind = np.argsort(lengths)
     
+    if len(ind) < 2:
+        return 0, 0
+    else:
+        angle1 = angles[ind[0]]
+        angle2 = angles[ind[1]]
+        for i in range(1, len(ind)):
+            if np.abs(np.abs(angles[ind[i]]) - np.abs(angle1)) >10:
+                angle2 = angles[ind[i]]
+        
+        return angle1, angle2
+    
+
     
 while True:
     ###ret, img = cap.read()
@@ -95,6 +104,7 @@ while True:
     
     num = getDigit(blur, img, x, y, h, w)
     angles = GetAngle(blur, img, x, y, h, w)
+    print(angles)
     
     cv2.imshow("Frame", img)
     

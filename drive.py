@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO          
 import time
+from gpiozero import LED
 
 en1 = 19
 en2 = 12
@@ -25,11 +26,10 @@ class Motor:
 		self.en = en
 		GPIO.setup(self.in1, GPIO.OUT)
 		GPIO.setup(self.in2, GPIO.OUT)
-		GPIO.setup(self.en, GPIO.OUT)
 		GPIO.output(self.in1, GPIO.LOW)
 		GPIO.output(self.in2, GPIO.LOW)
-		self.p = GPIO.PWM(self.en, 1000)
-		self.p.start(0)
+		self.p = LED(en)
+		self.p.value = 0
 		
 	def setSpeed(self, speed):
 		if speed == 0:
@@ -38,11 +38,11 @@ class Motor:
 		elif speed > 0:
 			GPIO.output(self.in1, GPIO.LOW)
 			GPIO.output(self.in2, GPIO.HIGH)
-			self.p.ChangeDutyCycle(speed)
+			self.p.value = speed
 		elif speed < 0:
 			GPIO.output(self.in1, GPIO.HIGH)
 			GPIO.output(self.in2, GPIO.LOW)
-			self.p.ChangeDutyCycle(-speed)
+			self.p.value = -speed
 			
 			
 class Cart:
@@ -66,11 +66,11 @@ class Cart:
 	
 	def rotate90(self, where):
 		Time = 2 ######
-		speed = 5 #####
+		speed = 0.2 #####
 		if where == 'left':
 			self.fl.setSpeed(0)
 			self.br.setSpeed(0)
-			self.frsetSpeed(speed)
+			self.fr.setSpeed(speed)
 			self.bl.setSpeed(-speed)
 		elif where == 'right':
 			self.fr.setSpeed(0)
@@ -79,13 +79,15 @@ class Cart:
 			self.br.setSpeed(-speed)
 		begin = time.time()
 		while time.time() - begin < Time:
-			continue
+			print(cv.getAngle())
 		for motor in self.motors:
 			motor.setSpeed(0)
 			
 
 		def rotateAngle(self, angle):
 			pass
+			
+
 	
 m1 = Motor(in1_1, in1_2, en1)
 m2 = Motor(in2_1, in2_2, en2)
@@ -94,7 +96,7 @@ m4 = Motor(in4_1, in4_2, en4)
 
 cart = Cart(m1, m2, m3, m4)
 
-cart.moveForward(50, 7)
-#cart.rotate90('right')
-#m3.setSpeed(50)
-		
+cart.moveForward(0.7, 7)
+cart.rotate90('right')
+cart.rotate90('left')
+	
