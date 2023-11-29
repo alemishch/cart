@@ -6,6 +6,7 @@ import numpy as np
 import RPi.GPIO as GPIO          
 import time
 from gpiozero import LED
+import multiprocessing as mp
 
 en1 = 19
 en2 = 12
@@ -25,7 +26,6 @@ GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
 cam = Picamera2()
-fps = 30
 cam.preview_configuration.main.size = (640, 360)
 cam.preview_configuration.main.format = "RGB888"
 cam.preview_configuration.controls.FrameRate=30
@@ -46,7 +46,7 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 
     
 def getDigit(img_processed, img_raw, x, y, h, w):
-    ret, thresh = cv2.threshold(blur, 175, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    ret, thresh = cv2.threshold(img_processed, 175, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     newImage = thresh[y:y + h, x:x + w] 
     newImage = cv2.resize(newImage, (28, 28))
     newImage = np.array(newImage)
@@ -55,13 +55,12 @@ def getDigit(img_processed, img_raw, x, y, h, w):
     newImage = newImage.reshape(28, 28, 1)
     newImage = np.expand_dims(newImage, axis=0)
     ans = ''
-    
     ans = model.predict(newImage, verbose=0).argmax()
     
-    cv2.putText(img, "CNN : " + str(ans), (10, 320),
+    cv2.putText(img_raw, "CNN : " + str(ans), (10, 320),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                     
-    return ans    
+    return ans  
     
 def GetAngle(img_processed, img_raw, x, y, h, w):
     edges = cv2.Canny(img_processed, 50, 150)[y:y + h, x:x + w]
@@ -82,15 +81,50 @@ def GetAngle(img_processed, img_raw, x, y, h, w):
                 cv2.line(img_raw,(x1,y1),(x2,y2),(255,0,0),5)
                 lengths.append(np.sqrt((x1-x1)**2+(y1-y2)**2))
                 if y1>y2:                                           ########test later
-                    dx = y1-y2
+                    dx = x1-x2
                 else:
-                    dx = y2-y1
-                angles.append(180/np.pi*np.arctan(dx/np.abs(y1 - y2)))
+                    dx = x2-x1
+                angles.append(180/np.pi*np.arctan(dx/np.abs(y1 - y2))) ############# test zero
+    ind = np.argsort(lengths)
+    
+    if len(ind) < 2:
+        return 0, 0
+    else:
+        angle1 = angles[ind[0]]
+        angle2 = angles[ind[1]]
+        for i in range(1, len(ind)):
+            if np.abs(np.abs(angles[ind[i]]) - np.abs(angle1)) >10:
+                angle2 = angles[ind[i]]
+        
+        return angle1, angle2
+        
+        
+def videoLoop():
+	while True:
+		###ret, img = cap.read()
 
-    return angles
+
+		img=cam.capture_array()
+		
+		x, y, w, h = 0, 0, 300, 300 
+		
+		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		blur = cv2.GaussianBlur(gray, (5, 5), 0)
+		
+		cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
+		
+		num = getDigit(blur, img, x, y, h, w)
+		angles = GetAngle(blur, img, x, y, h, w)
+		print(angles)
+		
+		cv2.imshow("Frame", img)
+		
+		c = cv2.waitKey(1)
+		if c == 27:
+			break
+
     
-    
- class Motor:
+class Motor:
 	def __init__(self, in1, in2, en):
 		self.in1 = in1
 		self.in2 = in2
@@ -166,3 +200,16 @@ m3 = Motor(in3_1, in3_2, en3)
 m4 = Motor(in4_1, in4_2, en4)
 
 cart = Cart(m1, m2, m3, m4)
+
+def main():
+	p1 = mp.Process(target=videoLoop)
+	p1.start()
+	#p2 = mp.Process(target=cart.moveForward, args = (0.2, 2,))
+	#p2.start()
+	
+
+main()
+
+#cv2.destroyAllWindows()
+###cap.release()
+#cam.stop()
