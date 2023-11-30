@@ -6,7 +6,6 @@ import numpy as np
 import RPi.GPIO as GPIO          
 import time
 from gpiozero import LED
-import multiprocessing as mp
 
 en1 = 19
 en2 = 12
@@ -25,13 +24,6 @@ in4_2 = 7
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
-cam = Picamera2()
-cam.preview_configuration.main.size = (640, 360)
-cam.preview_configuration.main.format = "RGB888"
-cam.preview_configuration.controls.FrameRate=30
-cam.preview_configuration.align()
-cam.configure("preview")
-cam.start()
 
 json_file = open('model.json', 'r')
 loaded_model_json = json_file.read()
@@ -115,10 +107,10 @@ def videoLoop():
 		
 		num = getDigit(blur, img, x, y, h, w)
 		angles = GetAngle(blur, img, x, y, h, w)
-		print(angles)
+		#print(angles)
 		
 		cv2.imshow("Frame", img)
-		
+				
 		c = cv2.waitKey(1)
 		if c == 27:
 			break
@@ -158,13 +150,40 @@ class Cart:
 		self.br = m4
 		self.motors = [self.fl, self.fr, self.bl, self.br]
 		
+		self.cam = Picamera2()
+		self.cam.preview_configuration.main.size = (640, 360)
+		self.cam.preview_configuration.main.format = "RGB888"
+		self.cam.preview_configuration.controls.FrameRate=30
+		self.cam.preview_configuration.align()
+		self.cam.configure("preview")
+		self.cam.start()
 		
+	def image(self):	
+		self.img=self.cam.capture_array()
+		
+		x, y, w, h = 0, 0, 300, 300 
+		
+		gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
+		blur = cv2.GaussianBlur(gray, (5, 5), 0)
+		
+		cv2.rectangle(self.img, (x, y), (x + w, y + h), (255, 255, 255), 2)
+		
+		self.digit = getDigit(blur, self.img, x, y, h, w)
+		self.angles = GetAngle(blur, self.img, x, y, h, w)
+		
+		cv2.imshow("Frame", self.img)
+				
+		
+	
 	def moveForward(self, speed, Time):
+		start = time.time()
 		for motor in self.motors:
 			motor.setSpeed(speed)
-		start = time.time()
 		while time.time() - start < Time:
-			continue
+			self.image()
+			c = cv2.waitKey(1)
+			if c == 27:
+				break
 		for motor in self.motors:
 			motor.setSpeed(0)		
 	
@@ -172,6 +191,7 @@ class Cart:
 	def rotate90(self, where):
 		Time = 2 ######
 		speed = 0.2 #####
+		start = time.Time()
 		if where == 'left':
 			self.fl.setSpeed(0)
 			self.br.setSpeed(0)
@@ -182,9 +202,11 @@ class Cart:
 			self.bl.setSpeed(0)
 			self.fl.setSpeed(speed)
 			self.br.setSpeed(-speed)
-		begin = time.time()
-		while time.time() - begin < Time:
-			print(cv.getAngle())
+		while time.time() - start < Time:
+			self.image()
+			c = cv2.waitKey(1)
+			if c == 27:
+				break
 		for motor in self.motors:
 			motor.setSpeed(0)
 			
@@ -201,14 +223,9 @@ m4 = Motor(in4_1, in4_2, en4)
 
 cart = Cart(m1, m2, m3, m4)
 
-def main():
-	p1 = mp.Process(target=videoLoop)
-	p1.start()
-	#p2 = mp.Process(target=cart.moveForward, args = (0.2, 2,))
-	#p2.start()
-	
 
-main()
+cart.moveForward(0.5, 20)
+	
 
 #cv2.destroyAllWindows()
 ###cap.release()
