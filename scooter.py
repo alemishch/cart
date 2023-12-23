@@ -9,27 +9,55 @@ import numpy as np
 import RPi.GPIO as GPIO          
 import time
 from gpiozero import LED
+import struct
 
-ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
-ser.flush()
+SERIAL_BAUD = 115200
+START_FRAME = 0xABCD
+
+serial_port = "/dev/ttyS0"
+
+ser = serial.Serial(serial_port, SERIAL_BAUD, timeout=1)
+
+def send_data(steer, speed):
+    start_frame = struct.pack('<H', START_FRAME)
+    steer_data = struct.pack('<h', steer)
+    speed_data = struct.pack('<h', speed)
+
+    start_frame_value, = struct.unpack('<H', start_frame)
+    steer_value, = struct.unpack('<h', steer_data)
+    speed_value, = struct.unpack('<h', speed_data)
+    checksum = struct.pack('<H', (start_frame_value ^ steer_value ^ speed_value) & 0xFFFF)
+
+    message = start_frame + steer_data + speed_data + checksum
+    ser.write(message)
+    
+def find_intersection(x_start1, y_start1, x_end1, y_end1, x_start2, y_start2, x_end2, y_end2):
+	
+	if (x_end1-x_start1==0) or (x_end2-x_start2==0):
+		return None, None
+
+	m1 = (y_end1 - y_start1) / (x_end1 - x_start1)
+	b1 = y_start1 - m1 * x_start1
+
+	m2 = (y_end2 - y_start2) / (x_end2 - x_start2)
+	b2 = y_start2 - m2 * x_start2
+	if m1==m2:
+		return None, None
+
+	x = (b2 - b1) / (m1 - m2)
+	y = m1 * x + b1
+
+	return (x, y)
+
 '''
-while True:
-	ser.write(b'message\n')
-	line = ser.readline().decode('utf-8')
-	print(line)
-'''
-
-
-
-
 json_file = open('model.json', 'r')
 loaded_model_json = json_file.read()
 json_file.close()
 model = model_from_json(loaded_model_json)
 model.load_weights("model.h5")
 print("Loaded model from disk")
-
 model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
+''' 
     
 ###cap = cv2.VideoCapture(0)
         
@@ -44,6 +72,7 @@ class Cart:
 		self.cam.configure("preview")
 		self.cam.start()
 		
+		self.xcenter, self.ycenter = 0, 0
 		self.angles = (1, 1)
 		self.x, self.y, self.w, self.h = 220, 80, 200, 200  
 		
@@ -112,29 +141,41 @@ class Cart:
 		
 		if len(ind) < 2:
 			self.angles = [1, 1]
+			self.xcenter, self.ycenter = 0, 0
 		else:
 			angle1 = angles[ind[-1]]
+			line1 = lines[ind[-1]]
 			angle2 = angles[ind[-2]]   ################
+			line2 = lines[ind[-2]]
 			for i in range(1, len(ind)):
 				if np.abs(np.abs(angles[ind[i]]) - np.abs(angle1)) >10:
 					angle2 = angles[ind[i]]
+					line2 = lines[ind[i]]
 					break
+			
 			
 			self.angles = [angle1, angle2]
 			
+			self.xcenter, self.ycenter = find_intersection(line1[0][0], line1[0][1], line1[0][2], line1[0][3],
+				line2[0][0], line2[0][1], line2[0][2], line2[0][3])
+			
+			if (self.xcenter is not None and self.ycenter is not None and
+				self.xcenter < 640 and self.ycenter < 360):
+				self.img = cv2.circle(self.img, 
+					(int(self.xcenter)+self.w+20, int(self.ycenter)-20+self.h//2),
+					radius=10, color=(0, 0, 255), thickness=-1)
+			
+			
 	def setSpeed(self, speedL, speedR):
-		ser.write(speedL.to_bytes(1))	
-		ser.write(speedR.to_bytes(1))
-		ser.write(b'\n')
+		send_data(speedL, speedR)
 	
 	def moveForward(self, speed, Time):
+		print('forward')
 		start = time.time()
 		while time.time() - start < Time:
-			print('go')
-			#self.image
+			self.image()
+			time.sleep(0.01)
 			self.setSpeed(speed, speed)
-			line = ser.readline()
-			print(line)
 			c = cv2.waitKey(1)
 			if c == 27:
 				break
@@ -142,6 +183,7 @@ class Cart:
 	
 	
 	def rotate(self, where, speed, Time):
+		print('rotating ', where)
 		start = time.time()
 		while time.time() - start < Time:
 			self.image()
@@ -162,12 +204,16 @@ class Cart:
 		if Time > 0:
 			while time.time() - start < Time:
 				self.image()
+				self.setSpeed(0, 0)
+				time.sleep(0.01)
 				c = cv2.waitKey(1)
 				if c == 27:
 					break
 		else:
 			while True:
 				self.image()
+				self.setSpeed(0, 0)
+				time.sleep(0.01)
 				c = cv2.waitKey(1)
 				if c == 27:
 					break
@@ -189,16 +235,15 @@ class Cart:
 				break
 			
 			if angle >= 0:
-				self.rotate('left', 0.1, 0.04)
+				self.rotate('left', 10, 0.4)
 			else:
-				self.rotate('right', 0.1, 0.04)
+				self.rotate('right', 10, 0.4)
 			
 			
 cart = Cart()
 
-
-cart.moveForward(10, 2)
-
+cart.stay(40)
+cart.rotateAngle()
 			
 cv2.destroyAllWindows()
 ###cap.release()
