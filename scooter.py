@@ -101,11 +101,18 @@ class Cart:
 		self.angle = 0
 		self.x, self.y, self.w, self.h = 220, 80, 200, 200  
 		
+		self.lspeed = 0
+		
 	def image(self):	
 		self.img=self.cam.capture_array()
 		
-		gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
-		self.blur = cv2.GaussianBlur(gray, (5, 5), 0)
+		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
+		lower_red = np.array([0, 70, 70])
+		upper_red = np.array([10, 255, 255])
+		mask_red = cv2.inRange(hsv_image, lower_red, upper_red)
+		red_lines_image = cv2.bitwise_and(self.img, self.img, mask=mask_red)
+		gray_image = cv2.cvtColor(red_lines_image, cv2.COLOR_BGR2GRAY)
+		self.blur = cv2.GaussianBlur(gray_image, (3, 3), 0)
 		
 		cv2.rectangle(self.img, (self.x, self.y), (self.x + self.w, self.y + self.h), (255, 255, 255), 2)
 		
@@ -137,9 +144,9 @@ class Cart:
 		edges = cv2.Canny(self.blur[self.y:self.y + self.h, self.x:self.x + self.w], 50, 150)#[self.y:self.y + self.h, self.x:self.x + self.w]
 		rho = 1  # distance resolution in pixels of the Hough grid
 		theta = np.pi / 180  # angular resolution in radians of the Hough grid
-		threshold = 15 #15  # minimum number of votes (intersections in Hough grid cell)
-		min_line_length = 80 #80  # minimum number of pixels making up a line
-		max_line_gap = 20  # maximum gap in pixels between connectable line segments
+		threshold = 30 #15  # minimum number of votes (intersections in Hough grid cell)
+		min_line_length = 30 #80  # minimum number of pixels making up a line
+		max_line_gap = 5  # maximum gap in pixels between connectable line segments
 		
 
 		lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]),
@@ -165,30 +172,26 @@ class Cart:
 		ind = np.argsort(lengths)
 		
 		if len(ind)>0:
-			self.line_center = (lines[ind[-1]][0] + lines[ind[-1]][2])//2
+			self.line_center = (lines[ind[-1]][0][0] + lines[ind[-1]][0][2])//2
 			self.angle = angles[ind[-1]]
 
 		if len(ind) < 2:
 			self.angles = [1, 1]
-			self.xcenter, self.ycenter = 0, 0
+			self.xcenter, self.ycenter = -10, -10
 		else:
 			angle1 = angles[ind[-1]]
 			line1 = lines[ind[-1]]
-			angle2 = angles[ind[-2]]   ################
-			line2 = lines[ind[-2]]
 			for i in range(1, len(ind)):
 				if np.abs(np.abs(angles[ind[i]]) - np.abs(angle1)) >10:
 					angle2 = angles[ind[i]]
 					line2 = lines[ind[i]]
+					self.angles = [angle1, angle2]
+					self.xcenter, self.ycenter = find_intersection(line1[0][0], line1[0][1], line1[0][2], line1[0][3],
+						line2[0][0], line2[0][1], line2[0][2], line2[0][3])
 					break
 			
-			
-			self.angles = [angle1, angle2]
-			
-			self.xcenter, self.ycenter = find_intersection(line1[0][0], line1[0][1], line1[0][2], line1[0][3],
-				line2[0][0], line2[0][1], line2[0][2], line2[0][3])
-			
-			if is_point_inside_square((self.xcenter, self.ycenter), 200, (X, Y)):
+	
+			if is_point_inside_square((self.xcenter, self.ycenter), 200, (self.w, self.h)):
 				self.img = cv2.circle(self.img, 
 					(int(self.xcenter)+self.w+20, int(self.ycenter)-20+self.h//2),
 					radius=10, color=(0, 0, 255), thickness=-1)
@@ -197,18 +200,28 @@ class Cart:
 	def setSpeed(self, speedL, speedR):
 		send_data(speedL, speedR)
 	
+	def get_speed(self, speed):
+		kp_angle = 0.15
+		kp_center = 0.07
+		self.speed = speed
+		
+		center = self.line_center - self.w // 2
+		
+		lspeed = int(speed - kp_angle*self.angle - kp_center*center)
+		rspeed = int(speed + kp_angle*self.angle + kp_center*center)
+	
+		return lspeed, rspeed
+	
 	def moveForward(self, speed):
 		print('forward')
 		start = time.time()
-		while time.time() - start < Time:
+		while True:
 			self.image()
-			time.sleep(0.01)
-			if self.line_center > X//2:
-				self.setSpeed(int(speed*0.9), int(speed*1.1))
-			else:
-				self.setSpeed(int(speed*1.1), int(speed*0.9))
 			c = cv2.waitKey(1)
-			if (is_point_inside_square((self.xcenter, self.ycenter), 60, (X, Y)) and
+			time.sleep(0.01)
+			self.setSpeed(*self.get_speed(speed))
+			self.speed = 0
+			if (is_point_inside_square((self.xcenter, self.ycenter), 150, (self.w, self.h)) and
 				time.time() - start > 3):
 				print('choose path')
 				break
@@ -226,7 +239,8 @@ class Cart:
 				break
 			if where == 'left':
 				self.setSpeed(-speed, speed)
-				if self.angles[0]>0 and self.angles[1]>0:
+				print(self.angles)
+				if self.angles[0]<0 and self.angles[1]<0:
 					break
 			elif where == 'right':
 				self.setSpeed(speed, -speed)
@@ -264,9 +278,9 @@ cart = Cart()
 
 cart.stay(4)
 
-cart.moveForward(60)
-cart.rotate('left', 20)
-cart.moveForward(60)
+cart.moveForward(30)
+cart.rotate('left', 10)
+cart.moveForward(30)
 
 cv2.destroyAllWindows()
 ###cap.release()
