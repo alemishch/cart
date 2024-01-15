@@ -13,6 +13,8 @@ import struct
 
 SERIAL_BAUD = 115200
 START_FRAME = 0xABCD
+X = 640
+Y = 360
 
 serial_port = "/dev/ttyS0"
 
@@ -49,6 +51,27 @@ def find_intersection(x_start1, y_start1, x_end1, y_end1, x_start2, y_start2, x_
 
 	return (x, y)
 
+
+def is_point_inside_square(point, square_size, window_size):
+
+	x, y = point
+	width, height = window_size
+
+	if x is not None and y is not None:
+
+	    square_x1 = (width - square_size) // 2
+	    square_y1 = (height - square_size) // 2
+
+	    square_x2 = square_x1 + square_size
+	    square_y2 = square_y1 + square_size
+
+	    return square_x1 <= x <= square_x2 and square_y1 <= y <= square_y2
+
+	else:
+		return False
+
+
+
 '''
 json_file = open('model.json', 'r')
 loaded_model_json = json_file.read()
@@ -65,8 +88,7 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 class Cart:
 	def __init__(self):
 		self.cam = Picamera2()
-		self.angle = 1
-		self.cam.preview_configuration.main.size = (640, 360)
+		self.cam.preview_configuration.main.size = (X, Y)
 		self.cam.preview_configuration.main.format = "RGB888"
 		self.cam.preview_configuration.controls.FrameRate=30
 		self.cam.preview_configuration.align()
@@ -74,7 +96,9 @@ class Cart:
 		self.cam.start()
 		
 		self.xcenter, self.ycenter = 0, 0
-		self.angles = (1, 1)
+		self.line_center = 0
+		self.angles = (0, 0)
+		self.angle = 0
 		self.x, self.y, self.w, self.h = 220, 80, 200, 200  
 		
 	def image(self):	
@@ -140,6 +164,10 @@ class Cart:
 						
 		ind = np.argsort(lengths)
 		
+		if len(ind)>0:
+			self.line_center = (lines[ind[-1]][0] + lines[ind[-1]][2])//2
+			self.angle = angles[ind[-1]]
+
 		if len(ind) < 2:
 			self.angles = [1, 1]
 			self.xcenter, self.ycenter = 0, 0
@@ -160,8 +188,7 @@ class Cart:
 			self.xcenter, self.ycenter = find_intersection(line1[0][0], line1[0][1], line1[0][2], line1[0][3],
 				line2[0][0], line2[0][1], line2[0][2], line2[0][3])
 			
-			if (self.xcenter is not None and self.ycenter is not None and
-				self.xcenter < 640 and self.ycenter < 360):
+			if is_point_inside_square((self.xcenter, self.ycenter), 200, (X, Y)):
 				self.img = cv2.circle(self.img, 
 					(int(self.xcenter)+self.w+20, int(self.ycenter)-20+self.h//2),
 					radius=10, color=(0, 0, 255), thickness=-1)
@@ -170,52 +197,41 @@ class Cart:
 	def setSpeed(self, speedL, speedR):
 		send_data(speedL, speedR)
 	
-	def moveForward(self, speed, Time):
+	def moveForward(self, speed):
 		print('forward')
 		start = time.time()
 		while time.time() - start < Time:
 			self.image()
 			time.sleep(0.01)
-			self.setSpeed(speed, speed)
+			if self.line_center > X//2:
+				self.setSpeed(int(speed*0.9), int(speed*1.1))
+			else:
+				self.setSpeed(int(speed*1.1), int(speed*0.9))
 			c = cv2.waitKey(1)
-			if (self.xcenter is not None and
-			 self.xcenter > 120 and
-			  self.xcenter < 160 and
-			  time.time() - Time > 3):
-				print('got center')
+			if (is_point_inside_square((self.xcenter, self.ycenter), 60, (X, Y)) and
+				time.time() - start > 3):
+				print('choose path')
 				break
 			if c == 27:
 				break
 		self.setSpeed(0, 0)		
 	
 	
-	def rotate(self, where, speed, Time):
-		print('rotating ', where)
-		start = time.time()
-		if Time == 0:
-			while np.abs(self.angle) > 0.5:
-				self.image()
-				c = cv2.waitKey(1)
-				ind = np.argsort(np.abs(self.angles))
-				self.angle = self.angles[ind[0]]
-				if c == 27:
+	def rotate(self, where, speed):
+		print('rotating ', where)	
+		while True:
+			self.image()
+			c = cv2.waitKey(1)
+			if c == 27:
+				break
+			if where == 'left':
+				self.setSpeed(-speed, speed)
+				if self.angles[0]>0 and self.angles[1]>0:
 					break
-				if where == 'left':
-					self.setSpeed(-speed, speed)
-				elif where == 'right':
-					self.setSpeed(speed, -speed)
-			print('rotated')###############
-				
-		else:
-			while time.time() - start < Time:
-				self.image()
-				c = cv2.waitKey(1)
-				if c == 27:
+			elif where == 'right':
+				self.setSpeed(speed, -speed)
+				if self.angles[0]<0 and self.angles[1]<0:
 					break
-				if where == 'left':
-					self.setSpeed(-speed, speed)
-				elif where == 'right':
-					self.setSpeed(speed, -speed)
 			
 		self.setSpeed(0, 0)
 			
@@ -242,30 +258,16 @@ class Cart:
 			
 			
 
-	def rotateAngle(self):	
-		self.image()
-			
-		ind = np.argsort(np.abs(self.angles))
-		self.angle = self.angles[ind[0]]
-		
-		
-		if self.angle >= 0:
-			self.rotate('right', 10, 0)
-		else:
-			self.rotate('left', 10, 0)
 			
 			
 cart = Cart()
 
 cart.stay(4)
-#cart.moveForward(20, 3)
-#cart.rotate('left', 10, 15)
-#cart.rotateAngle()
-#cart.stay(5)
-cart.moveForward(30, 8)
-cart.rotate('left', 10, 6.6)
-cart.rotateAngle()
-cart.moveForward(60, 8)
+
+cart.moveForward(60)
+cart.rotate('left', 20)
+cart.moveForward(60)
+
 cv2.destroyAllWindows()
 ###cap.release()
 cart.cam.stop()
