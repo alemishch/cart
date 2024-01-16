@@ -107,8 +107,8 @@ class Cart:
 		self.img=self.cam.capture_array()
 		
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
-		lower_red = np.array([0, 70, 70])
-		upper_red = np.array([10, 255, 255])
+		lower_red = np.array([0, 50, 50])
+		upper_red = np.array([30, 255, 255])
 		mask_red = cv2.inRange(hsv_image, lower_red, upper_red)
 		red_lines_image = cv2.bitwise_and(self.img, self.img, mask=mask_red)
 		gray_image = cv2.cvtColor(red_lines_image, cv2.COLOR_BGR2GRAY)
@@ -176,7 +176,7 @@ class Cart:
 			self.angle = angles[ind[-1]]
 
 		if len(ind) < 2:
-			self.angles = [1, 1]
+			#self.angles = [1, 1]
 			self.xcenter, self.ycenter = -10, -10
 		else:
 			angle1 = angles[ind[-1]]
@@ -202,7 +202,7 @@ class Cart:
 	
 	def get_speed(self, speed):
 		kp_angle = 0.15
-		kp_center = 0.07
+		kp_center = 0.09
 		self.speed = speed
 		
 		center = self.line_center - self.w // 2
@@ -222,7 +222,7 @@ class Cart:
 			self.setSpeed(*self.get_speed(speed))
 			self.speed = 0
 			if (is_point_inside_square((self.xcenter, self.ycenter), 150, (self.w, self.h)) and
-				time.time() - start > 3):
+				time.time() - start > 5):
 				print('choose path')
 				break
 			if c == 27:
@@ -231,20 +231,27 @@ class Cart:
 	
 	
 	def rotate(self, where, speed):
-		print('rotating ', where)	
+		print('rotating ', where)
+		start = time.time()	
 		while True:
 			self.image()
+			print(self.angles)
 			c = cv2.waitKey(1)
 			if c == 27:
 				break
 			if where == 'left':
 				self.setSpeed(-speed, speed)
-				print(self.angles)
-				if self.angles[0]<0 and self.angles[1]<0:
+				if (np.abs(self.angles[0])<10 and 
+				(np.abs(self.angles[1]+90)<5 or np.abs(self.angles[1]-90)<5) and
+				 time.time()-start>0.7):
+					self.setSpeed(0, 0)
 					break
 			elif where == 'right':
 				self.setSpeed(speed, -speed)
-				if self.angles[0]<0 and self.angles[1]<0:
+				if (np.abs(self.angles[0])<10 and 
+				(np.abs(self.angles[1]+90)<5 or np.abs(self.angles[1]-90)<5) and
+				 time.time()-start>0.7):
+					self.setSpeed(0, 0)
 					break
 			
 		self.setSpeed(0, 0)
@@ -255,6 +262,7 @@ class Cart:
 		start = time.time()
 		if Time > 0:
 			while time.time() - start < Time:
+				print(self.angles)
 				self.image()
 				self.setSpeed(0, 0)
 				time.sleep(0.01)
@@ -278,7 +286,7 @@ cart = Cart()
 
 cart.stay(4)
 
-cart.moveForward(30)
+#cart.moveForward(30)
 cart.rotate('left', 10)
 cart.moveForward(30)
 
