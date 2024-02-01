@@ -90,7 +90,7 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 class Cart:
 	def __init__(self):
 		self.cam = Picamera2()
-
+		'''
 		layout = [[sg.Image(filename='', key='image', background_color='white')],
 		          [sg.Button('Exit')]]
 		# Create the window
@@ -102,7 +102,7 @@ class Cart:
 		self.video_thread = Thread(target=self.image)
 		self.video_thread.daemon = True  # Daemonize thread to close with the main program
 		self.video_thread.start()
-
+		'''
 		self.cam.preview_configuration.main.size = (X, Y)
 		self.cam.preview_configuration.main.format = "RGB888"
 		self.cam.preview_configuration.controls.FrameRate=30
@@ -136,7 +136,8 @@ class Cart:
 		#self.getDigit()
 		self.GetAngle()
 		
-		###cv2.imshow("Frame", self.img)
+		cv2.imshow("Frame", self.img)
+		'''
 		event, values = self.window.read(timeout=10)
 		
 		if self.img is not None:
@@ -151,6 +152,7 @@ class Cart:
 		if event == sg.WIN_CLOSED or event == 'Exit':
 			self.window.close()
 			self.cam.stop()
+		'''
 		
 		
 	def getDigit(self):
@@ -233,14 +235,14 @@ class Cart:
 		send_data(speedL, speedR)
 	
 	def get_speed(self, speed):
-		kp_angle = 0.15
-		kp_center = 0.09
+		kp_angle = 0.17
+		kp_center = 0.08
 		self.speed = speed
 		
 		center = self.line_center - self.w // 2
 		
-		lspeed = int(speed - kp_angle*self.angle - kp_center*center)
-		rspeed = int(speed + kp_angle*self.angle + kp_center*center)
+		lspeed = int(speed + kp_angle*self.angle - kp_center*center)
+		rspeed = int(speed - kp_angle*self.angle + kp_center*center)
 	
 		return lspeed, rspeed
 	
@@ -253,7 +255,7 @@ class Cart:
 			time.sleep(0.01)
 			self.setSpeed(*self.get_speed(speed))
 			self.speed = 0
-			if (is_point_inside_square((self.xcenter, self.ycenter), 150, (self.w, self.h)) and
+			if (is_point_inside_square((self.xcenter, self.ycenter), 120, (self.w, self.h)) and
 				time.time() - start > 5):
 				print('choose path')
 				break
@@ -328,7 +330,7 @@ class Cart:
 		start = time.time()
 		if Time > 0:
 			while time.time() - start < Time:
-				print(self.angles)
+				print(self.angle)
 				self.image()
 				self.setSpeed(0, 0)
 				time.sleep(0.01)
@@ -352,7 +354,7 @@ cart = Cart()
 
 cart.stay(4)
 
-#cart.moveForward(30)
+cart.moveForward(20)
 cart.rotate('left', 10)
 cart.moveForward(30)
 
