@@ -6,10 +6,12 @@ import time
 from picamera2 import Picamera2
 from keras.models import model_from_json
 import numpy as np
-import RPi.GPIO as GPIO          
 import time
-from gpiozero import LED
 import struct
+
+import PySimpleGUI as sg
+from PIL import Image, ImageTk
+from threading import Thread
 
 SERIAL_BAUD = 115200
 START_FRAME = 0xABCD
@@ -88,6 +90,19 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 class Cart:
 	def __init__(self):
 		self.cam = Picamera2()
+
+		layout = [[sg.Image(filename='', key='image', background_color='white')],
+		          [sg.Button('Exit')]]
+		# Create the window
+		self.window = sg.Window('cart', layout, resizable=True, finalize=True, background_color='white')
+		self.window.Maximize()
+		self.image_elem = self.window['image']
+		self.img = None
+		# Start a separate thread for video processing
+		self.video_thread = Thread(target=self.image)
+		self.video_thread.daemon = True  # Daemonize thread to close with the main program
+		self.video_thread.start()
+
 		self.cam.preview_configuration.main.size = (X, Y)
 		self.cam.preview_configuration.main.format = "RGB888"
 		self.cam.preview_configuration.controls.FrameRate=30
@@ -100,15 +115,17 @@ class Cart:
 		self.angles = (0, 0)
 		self.angle = 0
 		self.x, self.y, self.w, self.h = 220, 80, 200, 200  
+		self.lines = []
 		
-		self.lspeed = 0
 		
 	def image(self):	
 		self.img=self.cam.capture_array()
 		
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
-		lower_red = np.array([0, 50, 50])
-		upper_red = np.array([30, 255, 255])
+		#lower_red = np.array([0, 50, 50])
+		#upper_red = np.array([30, 255, 255])
+		lower_red = np.array([0, 20, 20])
+		upper_red = np.array([10, 255, 255])
 		mask_red = cv2.inRange(hsv_image, lower_red, upper_red)
 		red_lines_image = cv2.bitwise_and(self.img, self.img, mask=mask_red)
 		gray_image = cv2.cvtColor(red_lines_image, cv2.COLOR_BGR2GRAY)
@@ -119,7 +136,21 @@ class Cart:
 		#self.getDigit()
 		self.GetAngle()
 		
-		cv2.imshow("Frame", self.img)
+		###cv2.imshow("Frame", self.img)
+		event, values = self.window.read(timeout=10)
+		
+		if self.img is not None:
+		    img = Image.fromarray(self.img)
+		    img_tk = ImageTk.PhotoImage(img)
+
+		    # Update the GUI window
+		    self.image_elem.update(data=img_tk)
+
+		# Schedule the next GUI update
+		self.window.refresh()
+		if event == sg.WIN_CLOSED or event == 'Exit':
+			self.window.close()
+			self.cam.stop()
 		
 		
 	def getDigit(self):
@@ -185,6 +216,7 @@ class Cart:
 				if np.abs(np.abs(angles[ind[i]]) - np.abs(angle1)) >10:
 					angle2 = angles[ind[i]]
 					line2 = lines[ind[i]]
+					self.lines = [line1, line2]
 					self.angles = [angle1, angle2]
 					self.xcenter, self.ycenter = find_intersection(line1[0][0], line1[0][1], line1[0][2], line1[0][3],
 						line2[0][0], line2[0][1], line2[0][2], line2[0][3])
@@ -251,6 +283,40 @@ class Cart:
 				if (np.abs(self.angles[0])<10 and 
 				(np.abs(self.angles[1]+90)<5 or np.abs(self.angles[1]-90)<5) and
 				 time.time()-start>0.7):
+					self.setSpeed(0, 0)
+					break
+			
+		self.setSpeed(0, 0)
+
+
+	def rotate_test(self, speed):
+		while True:
+			if len(self.angles) > 1:
+				if self.lines[1][0] + self.lines[1][2] < self.lines[0][0] + self.lines[0][2]:
+					where = 'left'
+				else:
+					where = 'right'
+				temp_angle = np.abs(self.angles[1])
+				break
+		print('rotating ', where)
+		start = time.time()	
+		while True:
+			self.image()
+			c = cv2.waitKey(1)
+			if c == 27:
+				break
+			if where == 'left':
+				self.setSpeed(-speed, speed)
+				if (np.abs(self.angles[0])<5 and 
+				np.abs(np.abs(self.angles[1]) - temp_angle) < 5 and
+				 time.time()-start>0.4):
+					self.setSpeed(0, 0)
+					break
+			elif where == 'right':
+				self.setSpeed(speed, -speed)
+				if (np.abs(self.angles[0])<5 and 
+				np.abs(np.abs(self.angles[1]) - temp_angle) < 5 and
+				 time.time()-start>0.4):
 					self.setSpeed(0, 0)
 					break
 			
