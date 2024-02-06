@@ -3,8 +3,7 @@
 import serial
 import cv2
 import time
-from picamera2 import Picamera2
-from keras.models import model_from_json
+#from keras.models import model_from_json
 import numpy as np
 import time
 import struct
@@ -18,24 +17,29 @@ SERIAL_BAUD = 115200
 START_FRAME = 0xABCD
 X = 640
 Y = 360
+
 ENABLE_GUI = 1
 
-serial_port = "/dev/ttyS0"
+serial_port = 'COM1'
 
-ser = serial.Serial(serial_port, SERIAL_BAUD, timeout=1)
+#ser = serial.Serial(serial_port, SERIAL_BAUD, timeout=1)
+
 
 def send_data(steer, speed):
-    start_frame = struct.pack('<H', START_FRAME)
-    steer_data = struct.pack('<h', steer)
-    speed_data = struct.pack('<h', speed)
+	try:
+	    start_frame = struct.pack('<H', START_FRAME)
+	    steer_data = struct.pack('<h', steer)
+	    speed_data = struct.pack('<h', speed)
 
-    start_frame_value, = struct.unpack('<H', start_frame)
-    steer_value, = struct.unpack('<h', steer_data)
-    speed_value, = struct.unpack('<h', speed_data)
-    checksum = struct.pack('<H', (start_frame_value ^ steer_value ^ speed_value) & 0xFFFF)
+	    start_frame_value, = struct.unpack('<H', start_frame)
+	    steer_value, = struct.unpack('<h', steer_data)
+	    speed_value, = struct.unpack('<h', speed_data)
+	    checksum = struct.pack('<H', (start_frame_value ^ steer_value ^ speed_value) & 0xFFFF)
 
-    message = start_frame + steer_data + speed_data + checksum
-    ser.write(message)
+	    message = start_frame + steer_data + speed_data + checksum
+	    ser.write(message)
+	except:
+		pass
     
 def find_intersection(x_start1, y_start1, x_end1, y_end1, x_start2, y_start2, x_end2, y_end2):
 	
@@ -91,7 +95,7 @@ model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = [
 			
 class Cart:
 	def __init__(self):
-		self.cam = Picamera2()
+		self.cap = cv2.VideoCapture(0)
 
 		if ENABLE_GUI == 1:
 			self.create_layout()
@@ -99,14 +103,7 @@ class Cart:
 		self.video_thread = Thread(target=self.image)
 		self.video_thread.daemon = True  # Daemonize thread to close with the main program
 		self.video_thread.start()
-		
-		self.cam.preview_configuration.main.size = (X, Y)
-		self.cam.preview_configuration.main.format = "RGB888"
-		self.cam.preview_configuration.controls.FrameRate=30
-		self.cam.preview_configuration.align()
-		self.cam.configure("preview")
-		self.cam.start()
-		
+
 		self.xcenter, self.ycenter = 0, 0
 		self.line_center = 0
 		self.angles = (0, 0)
@@ -150,15 +147,20 @@ class Cart:
 		self.image_elem = self.window['image']
 		self.img = None
 		
-		
 	def image(self):	
-		self.img=self.cam.capture_array()
+		ret, self.img = self.cap.read()
+
+		if not ret:
+			print("Error: Couldn't read frame. Exiting.")
+			
+
+		self.img = cv2.resize(self.img, (X, Y))
 		
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
-		#lower_red = np.array([0, 50, 50])
-		#upper_red = np.array([30, 255, 255])
-		lower_red = np.array([0, 20, 20])
-		upper_red = np.array([10, 255, 255])
+		lower_red = np.array([0, 50, 50])
+		upper_red = np.array([30, 255, 255])
+		#lower_red = np.array([0, 20, 20])
+		#upper_red = np.array([10, 255, 255])
 		mask_red = cv2.inRange(hsv_image, lower_red, upper_red)
 		red_lines_image = cv2.bitwise_and(self.img, self.img, mask=mask_red)
 		gray_image = cv2.cvtColor(red_lines_image, cv2.COLOR_BGR2GRAY)
@@ -168,27 +170,12 @@ class Cart:
 		
 		#self.getDigit()
 		self.GetAngle()
-		
+
 		if ENABLE_GUI == 1:
 			self.updateGui()
 		else:
 			cv2.imshow("Frame", self.img)
-		'''
-		event, values = self.window.read(timeout=10)
-		
-		if self.img is not None:
-		    img = Image.fromarray(self.img)
-		    img_tk = ImageTk.PhotoImage(img)
 
-		    # Update the GUI window
-		    self.image_elem.update(data=img_tk)
-
-		# Schedule the next GUI update
-		self.window.refresh()
-		if event == sg.WIN_CLOSED or event == 'Exit':
-			self.window.close()
-			self.cam.stop()
-		'''
 		
 	def updateGui(self):
 		event, values = self.window.read(timeout=10)
@@ -196,7 +183,7 @@ class Cart:
 		if event == sg.WIN_CLOSED or event == 'Exit':
 			self.status = 'OFF'
 			self.window.close()
-			self.cam.stop()
+			self.cap.release()
 
 		if event == '0':
 			self.isMoving = 1
@@ -219,6 +206,10 @@ class Cart:
 		# Schedule the next GUI update
 		self.window.refresh()
 
+	def kill(self):
+		self.setSpeed(0, 0)
+		#TODO
+
 
 	def run(self):
 		if self.isMoving == 1:
@@ -228,7 +219,7 @@ class Cart:
 				partial_func()
 			self.isMoving = 0
 		print('exit run')
-		
+
 	def getDigit(self):
 		ret, thresh = cv2.threshold(self.blur, 175, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 		newImage = thresh[self.y:self.y + self.h, self.x:self.x + self.w] 
@@ -309,14 +300,14 @@ class Cart:
 		send_data(speedL, speedR)
 	
 	def get_speed(self, speed):
-		kp_angle = 0.17
-		kp_center = 0.08
+		kp_angle = 0.15
+		kp_center = 0.09
 		self.speed = speed
 		
 		center = self.line_center - self.w // 2
 		
-		lspeed = int(speed + kp_angle*self.angle - kp_center*center)
-		rspeed = int(speed - kp_angle*self.angle + kp_center*center)
+		lspeed = int(speed - kp_angle*self.angle - kp_center*center)
+		rspeed = int(speed + kp_angle*self.angle + kp_center*center)
 	
 		return lspeed, rspeed
 	
@@ -329,7 +320,7 @@ class Cart:
 			time.sleep(0.01)
 			self.setSpeed(*self.get_speed(speed))
 			self.speed = 0
-			if (is_point_inside_square((self.xcenter, self.ycenter), 120, (self.w, self.h)) and
+			if (is_point_inside_square((self.xcenter, self.ycenter), 150, (self.w, self.h)) and
 				time.time() - start > 5):
 				print('choose path')
 				break
@@ -343,7 +334,6 @@ class Cart:
 		start = time.time()	
 		while self.isMoving == 1:
 			self.image()
-			print(self.angles)
 			c = cv2.waitKey(1)
 			if c == 27:
 				break
@@ -404,7 +394,7 @@ class Cart:
 		start = time.time()
 		if Time > 0:
 			while time.time() - start < Time and self.isMoving == 1:
-				print(self.angle)
+				#print(self.angles)
 				self.image()
 				self.setSpeed(0, 0)
 				time.sleep(0.01)
@@ -412,7 +402,7 @@ class Cart:
 				if c == 27:
 					break
 		else:
-			while self.isMoving == 1:
+			while self.isMoving == 0:
 				self.image()
 				self.setSpeed(0, 0)
 				time.sleep(0.01)
@@ -420,12 +410,14 @@ class Cart:
 				if c == 27:
 					break
 			print(start)
+
+			
+
 			
 			
-	
 cart = Cart()
 cart.main()
 
 cv2.destroyAllWindows()
-###cap.release()
-cart.cam.stop()
+cart.cap.release()
+
