@@ -159,8 +159,8 @@ class Cart:
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
 		#lower_red = np.array([0, 50, 50])
 		#upper_red = np.array([30, 255, 255])
-		lower_red = np.array([0, 20, 20])
-		upper_red = np.array([10, 255, 255])
+		lower_red = np.array([0, 10, 10])
+		upper_red = np.array([25, 255, 255])
 		mask_red = cv2.inRange(hsv_image, lower_red, upper_red)
 		red_lines_image = cv2.bitwise_and(self.img, self.img, mask=mask_red)
 		gray_image = cv2.cvtColor(red_lines_image, cv2.COLOR_BGR2GRAY)
@@ -332,7 +332,7 @@ class Cart:
 			time.sleep(0.01)
 			self.setSpeed(*self.get_speed(speed))
 			self.speed = 0
-			if (is_point_inside_square((self.xcenter, self.ycenter), 120, (self.w, self.h)) and
+			if (is_point_inside_square((self.xcenter, self.ycenter), 100, (self.w, self.h)) and
 				time.time() - start > 5):
 				print('choose path')
 				break
@@ -348,22 +348,21 @@ class Cart:
 		start = time.time()	
 		while self.isMoving == 1:
 			self.image()
-			print(self.angles)
 			c = cv2.waitKey(1)
 			if c == 27:
 				break
 			if where == 'left':
 				self.setSpeed(-speed, speed)
 				if (np.abs(self.angles[0])<10 and 
-				(np.abs(self.angles[1]+90)<5 or np.abs(self.angles[1]-90)<5) and
-				 time.time()-start>0.7):
+				(np.abs(self.angles[1]+90)<3 or np.abs(self.angles[1]-90)<3) and
+				 time.time()-start>0.5):
 					self.setSpeed(0, 0)
 					break
 			elif where == 'right':
 				self.setSpeed(speed, -speed)
 				if (np.abs(self.angles[0])<10 and 
-				(np.abs(self.angles[1]+90)<5 or np.abs(self.angles[1]-90)<5) and
-				 time.time()-start>0.7):
+				(np.abs(self.angles[1]+90)<3 or np.abs(self.angles[1]-90)<3) and
+				 time.time()-start>0.5):
 					self.setSpeed(0, 0)
 					break
 			
