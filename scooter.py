@@ -55,6 +55,27 @@ def find_intersection(x_start1, y_start1, x_end1, y_end1, x_start2, y_start2, x_
 
 	return (x, y)
 
+def normalizeBrightness(image):
+	if image is None:
+	    print("Error: Unable to load the image.")
+	    return None
+
+	hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+	lower_bound = np.array([0, 0, 200], dtype=np.uint8)
+	upper_bound = np.array([255, 255, 255], dtype=np.uint8)
+
+	mask = cv2.inRange(hsv, lower_bound, upper_bound)
+	brightness_adjustment = -50
+	image[mask > 0] = np.clip(image[mask > 0].astype(int) + brightness_adjustment, 0, 255).astype(np.uint8)
+
+	inverted_mask = cv2.bitwise_not(mask)
+	brightness_adjustment = 50
+	image[inverted_mask > 0] = np.clip(image[inverted_mask > 0].astype(int) + brightness_adjustment, 0, 255).astype(np.uint8)
+
+	result = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
+
+	return result
 
 def is_point_inside_square(point, square_size, window_size):
 
@@ -155,6 +176,7 @@ class Cart:
 		
 	def image(self):	
 		self.img=self.cam.capture_array()
+		self.img = normalizeBrightness(self.img)
 		
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
 		#lower_red = np.array([0, 50, 50])
