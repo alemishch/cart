@@ -144,8 +144,8 @@ class Cart:
 				 sg.Button('STOP', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
 		        [sg.Button('Exit', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
 
-		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True, size=(800, 480))
-		#self.window.Maximize()
+		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True)#, size=(800, 480))
+		self.window.Maximize()
 
 		self.image_elem = self.window['image']
 		self.img = None
@@ -173,22 +173,6 @@ class Cart:
 			self.updateGui()
 		else:
 			cv2.imshow("Frame", self.img)
-		'''
-		event, values = self.window.read(timeout=10)
-		
-		if self.img is not None:
-		    img = Image.fromarray(self.img)
-		    img_tk = ImageTk.PhotoImage(img)
-
-		    # Update the GUI window
-		    self.image_elem.update(data=img_tk)
-
-		# Schedule the next GUI update
-		self.window.refresh()
-		if event == sg.WIN_CLOSED or event == 'Exit':
-			self.window.close()
-			self.cam.stop()
-		'''
 		
 	def updateGui(self):
 		event, values = self.window.read(timeout=10)
@@ -403,7 +387,7 @@ class Cart:
 		print('staying')
 		start = time.time()
 		if Time > 0:
-			while time.time() - start < Time and self.isMoving == 1:
+			while time.time() - start < Time and self.isMoving == 0:
 				print(self.angle)
 				self.image()
 				self.setSpeed(0, 0)
@@ -412,7 +396,7 @@ class Cart:
 				if c == 27:
 					break
 		else:
-			while self.isMoving == 1:
+			while self.isMoving == 0:
 				self.image()
 				self.setSpeed(0, 0)
 				time.sleep(0.01)
