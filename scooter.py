@@ -115,6 +115,7 @@ class Cart:
 		self.lines = []
 		self.isMoving = 0
 		self.status = 'ON'
+		self.goingHome = 0
 
 		self.route = []
 		self.routes = [[(self.stay, (4,)),
@@ -141,7 +142,8 @@ class Cart:
 				[sg.Multiline(default_text='Выберите Маршрут', size=(25, 1), disabled=True, background_color='gray', text_color='white', no_scrollbar=True),
 				 sg.Button('0', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('1', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
-				 sg.Button('STOP', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
+				 sg.Button('BACK', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
+				 sg.Button('STOP', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),],
 		        [sg.Button('Exit', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
 
 		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True)#, size=(800, 480))
@@ -193,6 +195,10 @@ class Cart:
 		if event == 'STOP':
 			self.isMoving = 0
 
+		if event == 'BACK':
+			self.isMoving = 1
+			self.getHome()
+
 		if self.img is not None:
 		    img = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
 		    img_tk = ImageTk.PhotoImage(img)
@@ -203,6 +209,19 @@ class Cart:
 		# Schedule the next GUI update
 		self.window.refresh()
 
+	def getHome(self):
+		print('returning')
+		self.goingHome = 1
+		self.rotate('right', 10)
+		self.rotate('right', 10)
+		for func, params in self.route[::-1]:
+			partial_func = partial(func, *params)
+			partial_func()
+		self.rotate('right', 10)
+		self.rotate('right', 10)
+		self.isMoving = 0
+		print('at home')
+		self.goingHome = 0
 
 	def run(self):
 		if self.isMoving == 1:
@@ -323,6 +342,8 @@ class Cart:
 	
 	
 	def rotate(self, where, speed):
+		if self.goingHome == 1:
+			speed = -speed
 		print('rotating ', where)
 		start = time.time()	
 		while self.isMoving == 1:
