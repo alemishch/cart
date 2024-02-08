@@ -128,23 +128,29 @@ class Cart:
 		self.isMoving = 0
 		self.status = 'ON'
 		self.goingHome = 0
+		self.pause_button = 1
+		self.off_button = 1
 
 		self.route = []
 		self.routes = [[(self.stay, (4,)),
 						(self.moveForward, (30,)), 
 						(self.rotate, ('left', 10)), 
-						(self.moveForward, (30,))],
+						(self.moveForward, (30,)),
+						(self.stay, (4,))],
 					   [(self.stay, (4,)), 
 					    (self.moveForward, (30,)), 
 					    (self.rotate, ('left', 10)),
 					    (self.rotate, ('left', 10)),
-					    (self.moveForward, (30,))]]
+					    (self.moveForward, (30,)),
+					    (self.stay, (4,))]]
 
 
 	def main(self):
 		while self.status == 'ON':
 			self.stay(0)
 			self.run()
+			self.stay(0)
+			self.getHome()
 
 	def create_layout(self):
 		sg.theme('LightGreen4')
@@ -155,15 +161,17 @@ class Cart:
 				 sg.Button('0', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('1', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('BACK', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
-				 sg.Button('STOP', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),],
-		        [sg.Button('Exit', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
+				 sg.Button('PAUSE', key='-pause-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
+				[sg.Button('TURN OFF', key = '-off-', size=(9, 1), font=('Helvetica', 12), button_color=('white', 'green')),
+		         sg.Button('Exit', key='-exit-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
 
-		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True)#, size=(800, 480))
-		self.window.Maximize()
+		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True,
+		               return_keyboard_events=True, use_default_focus=False)
 
 		self.image_elem = self.window['image']
 		self.img = None
-		
+		self.window.bind('<Escape>', '-esc-')
+		self.window.bind('<Space>', '-space-')
 		
 	def image(self):	
 		self.img=self.cam.capture_array()
@@ -192,7 +200,7 @@ class Cart:
 	def updateGui(self):
 		event, values = self.window.read(timeout=10)
 			
-		if event == sg.WIN_CLOSED or event == 'Exit':
+		if event == sg.WIN_CLOSED or event == '-exit-':
 			self.status = 'OFF'
 			self.window.close()
 			self.cam.stop()
@@ -205,8 +213,33 @@ class Cart:
 			self.isMoving = 1
 			self.route = self.routes[1]
 
-		if event == 'STOP':
-			self.isMoving = 0
+		if event == '-off-' or event == '-esc-':
+			if self.off_button == 1:
+				self.off_button = 0
+				print('turning off')
+				self.status = 0
+				self.window['-off-'].update(text='TURN ON')
+			else:
+				self.off_button = 1
+				self.route = []
+				print('turning on')
+				self.status = 1
+				self.window['-off-'].update(text='TURN OFF')
+				self.main()
+
+		if event == '-pause-' or event == ' ':
+			if self.pause_button == 1:
+				print('paused')
+				self.pause_button = 0
+				self.window['-pause-'].update(text='GO')
+				self.isMoving = 0
+				self.stay(0)
+			if self.pause_button == 0:
+				print('continue')
+				self.pause_button = 1
+				self.window['-pause-'].update(text='PAUSE')
+				self.isMoving = 1
+
 
 		if event == 'BACK':
 			self.isMoving = 1
