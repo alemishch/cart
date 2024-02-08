@@ -55,27 +55,18 @@ def find_intersection(x_start1, y_start1, x_end1, y_end1, x_start2, y_start2, x_
 
 	return (x, y)
 
-def normalizeBrightness(image):
-	if image is None:
-	    print("Error: Unable to load the image.")
-	    return None
+def enhance_red_color(image, saturation_factor=2.0):
+	hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-	hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+	h_channel, s_channel, v_channel = cv2.split(hsv_image)
 
-	lower_bound = np.array([0, 0, 200], dtype=np.uint8)
-	upper_bound = np.array([255, 255, 255], dtype=np.uint8)
+	s_channel[s_channel > 60] = np.clip(s_channel[s_channel > 60] * saturation_factor, 0, 255)
 
-	mask = cv2.inRange(hsv, lower_bound, upper_bound)
-	brightness_adjustment = -50
-	image[mask > 0] = np.clip(image[mask > 0].astype(int) + brightness_adjustment, 0, 255).astype(np.uint8)
+	enhanced_hsv_image = cv2.merge((h_channel, s_channel, v_channel))
 
-	inverted_mask = cv2.bitwise_not(mask)
-	brightness_adjustment = 50
-	image[inverted_mask > 0] = np.clip(image[inverted_mask > 0].astype(int) + brightness_adjustment, 0, 255).astype(np.uint8)
+	enhanced_image = cv2.cvtColor(enhanced_hsv_image, cv2.COLOR_HSV2BGR)
 
-	result = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
-
-	return result
+	return enhanced_image
 
 def is_point_inside_square(point, square_size, window_size):
 
@@ -137,23 +128,29 @@ class Cart:
 		self.isMoving = 0
 		self.status = 'ON'
 		self.goingHome = 0
+		self.pause_button = 1
+		self.off_button = 1
 
 		self.route = []
 		self.routes = [[(self.stay, (4,)),
 						(self.moveForward, (30,)), 
 						(self.rotate, ('left', 10)), 
-						(self.moveForward, (30,))],
+						(self.moveForward, (30,)),
+						(self.stay, (4,))],
 					   [(self.stay, (4,)), 
 					    (self.moveForward, (30,)), 
 					    (self.rotate, ('left', 10)),
 					    (self.rotate, ('left', 10)),
-					    (self.moveForward, (30,))]]
+					    (self.moveForward, (30,)),
+					    (self.stay, (4,))]]
 
 
 	def main(self):
 		while self.status == 'ON':
 			self.stay(0)
 			self.run()
+			self.stay(0)
+			self.getHome()
 
 	def create_layout(self):
 		sg.theme('LightGreen4')
@@ -164,19 +161,21 @@ class Cart:
 				 sg.Button('0', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('1', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('BACK', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
-				 sg.Button('STOP', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),],
-		        [sg.Button('Exit', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
+				 sg.Button('PAUSE', key='-pause-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
+				[sg.Button('TURN OFF', key = '-off-', size=(9, 1), font=('Helvetica', 12), button_color=('white', 'green')),
+		         sg.Button('Exit', key='-exit-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
 
-		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True)#, size=(800, 480))
-		self.window.Maximize()
+		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True,
+		               return_keyboard_events=True, use_default_focus=False)
 
 		self.image_elem = self.window['image']
 		self.img = None
-		
+		self.window.bind('<Escape>', '-esc-')
+		self.window.bind('<Space>', '-space-')
 		
 	def image(self):	
 		self.img=self.cam.capture_array()
-		self.img = normalizeBrightness(self.img)
+		self.img = enhance_red_color(self.img)
 		
 		hsv_image = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
 		#lower_red = np.array([0, 50, 50])
@@ -201,7 +200,7 @@ class Cart:
 	def updateGui(self):
 		event, values = self.window.read(timeout=10)
 			
-		if event == sg.WIN_CLOSED or event == 'Exit':
+		if event == sg.WIN_CLOSED or event == '-exit-':
 			self.status = 'OFF'
 			self.window.close()
 			self.cam.stop()
@@ -214,8 +213,33 @@ class Cart:
 			self.isMoving = 1
 			self.route = self.routes[1]
 
-		if event == 'STOP':
-			self.isMoving = 0
+		if event == '-off-' or event == '-esc-':
+			if self.off_button == 1:
+				self.off_button = 0
+				print('turning off')
+				self.status = 0
+				self.window['-off-'].update(text='TURN ON')
+			else:
+				self.off_button = 1
+				self.route = []
+				print('turning on')
+				self.status = 1
+				self.window['-off-'].update(text='TURN OFF')
+				self.main()
+
+		if event == '-pause-' or event == ' ':
+			if self.pause_button == 1:
+				print('paused')
+				self.pause_button = 0
+				self.window['-pause-'].update(text='GO')
+				self.isMoving = 0
+				self.stay(0)
+			if self.pause_button == 0:
+				print('continue')
+				self.pause_button = 1
+				self.window['-pause-'].update(text='PAUSE')
+				self.isMoving = 1
+
 
 		if event == 'BACK':
 			self.isMoving = 1
