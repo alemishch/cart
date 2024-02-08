@@ -161,13 +161,13 @@ class Cart:
 				 sg.Button('0', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('1', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 				 sg.Button('BACK', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green')),
-				 sg.Button('PAUSE', key='-pause-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
+				 sg.Button('PAUSE', key='-pause-', size=(6, 1), font=('Helvetica', 12), button_color=('white', 'green'))],
 				[sg.Button('TURN OFF', key = '-off-', size=(9, 1), font=('Helvetica', 12), button_color=('white', 'green')),
 		         sg.Button('Exit', key='-exit-', size=(5, 1), font=('Helvetica', 12), button_color=('white', 'green'))],]
 
 		self.window = sg.Window('cart', self.layout, resizable=True, finalize=True,
 		               return_keyboard_events=True, use_default_focus=False)
-
+		self.window.Maximize()
 		self.image_elem = self.window['image']
 		self.img = None
 		self.window.bind('<Escape>', '-esc-')
@@ -199,7 +199,7 @@ class Cart:
 		
 	def updateGui(self):
 		event, values = self.window.read(timeout=10)
-			
+
 		if event == sg.WIN_CLOSED or event == '-exit-':
 			self.status = 'OFF'
 			self.window.close()
@@ -227,7 +227,7 @@ class Cart:
 				self.window['-off-'].update(text='TURN OFF')
 				self.main()
 
-		if event == '-pause-' or event == ' ':
+		if event == '-pause-' or event == 'space:65':
 			if self.pause_button == 1:
 				print('paused')
 				self.pause_button = 0
