@@ -9,10 +9,13 @@ import numpy as np
 import time
 import struct
 from functools import partial
-
 import PySimpleGUI as sg
 from PIL import Image, ImageTk
 from threading import Thread
+from gpiozero import DistanceSensor, LED
+
+led = LED(1)
+led.on()
 
 SERIAL_BAUD = 115200
 START_FRAME = 0xABCD
@@ -130,6 +133,9 @@ class Cart:
 		self.goingHome = 0
 		self.pause_button = 1
 		self.off_button = 1
+		
+		self.s2 = DistanceSensor(echo=24, trigger=23)
+		self.s1 = DistanceSensor(echo=20, trigger=21)
 
 		self.route = []
 		self.routes = [[(self.stay, (4,)),
