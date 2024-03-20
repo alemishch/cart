@@ -4,7 +4,7 @@ import serial
 import cv2
 import time
 from picamera2 import Picamera2
-from keras.models import model_from_json
+#from keras.models import model_from_json
 import numpy as np
 import time
 import struct
@@ -14,8 +14,8 @@ from PIL import Image, ImageTk
 from threading import Thread
 from gpiozero import DistanceSensor, LED
 
-led = LED(1)
-led.on()
+#led = LED(1)
+#led.on()
 
 SERIAL_BAUD = 115200
 START_FRAME = 0xABCD
@@ -134,8 +134,7 @@ class Cart:
 		self.pause_button = 1
 		self.off_button = 1
 		
-		self.s2 = DistanceSensor(echo=24, trigger=23)
-		self.s1 = DistanceSensor(echo=20, trigger=21)
+		#self.s2 = DistanceSensor(echo=24, trigger=23)
 
 		self.route = []
 		self.routes = [[(self.stay, (4,)),
